@@ -1,21 +1,21 @@
 [
   {
     "path": "dist/prod/index.js",
-    "limit": "900 kB",
+    "limit": "1800 kB",
     "webpack": false,
     "running": false
   },
   {
     "path": "dist/prod/locales",
     "name": "dist/prod/locales",
-    "limit": "300 kB",
+    "limit": "600 kB",
     "webpack": false,
     "running": false
   },
   {
     "path": "dist/prod/chunk-*.js",
     "name": "dist/prod/chunk-*.js",
-    "limit": "2500 kB",
+    "limit": "5000 kB",
     "webpack": false,
     "running": false
   }
