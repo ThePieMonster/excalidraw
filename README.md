@@ -125,6 +125,7 @@ Last but not least, we're thankful to these companies for offering their service
 
 
 
+
 ## QA Agent Write-up & Tradeoffs
 
 The UI QA Agent evaluates Excalidraw functionality by parsing Pull Request descriptions for `QA_TESTING` blocks and automatically running browser tests.
