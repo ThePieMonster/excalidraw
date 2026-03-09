@@ -9,7 +9,6 @@ export async function reportResults(results: TestResult[], token: string) {
     // Check if we are running in GitHub Actions context
     if (!process.env.GITHUB_ACTIONS) {
       core.info("Running locally. Skipping GitHub PR comment posting.");
-      // Just print the results
       const totalPassed = results.filter(r => r.passed).length;
       const totalFailed = results.length - totalPassed;
       core.info(`Summary: ${totalPassed} Passed | ${totalFailed} Failed`);
@@ -23,6 +22,9 @@ export async function reportResults(results: TestResult[], token: string) {
     }
 
     const prNumber = context.payload.pull_request.number;
+    const owner = context.repo.owner;
+    const repo = context.repo.repo;
+    const runId = process.env.GITHUB_RUN_ID || 'unknown';
     const octokit = github.getOctokit(token);
     
     let totalPassed = 0;
@@ -42,22 +44,20 @@ export async function reportResults(results: TestResult[], token: string) {
          body += `**Error Details:**\n\`\`\`\n${res.reason}\n\`\`\`\n`;
       }
       
-      // Note: GitHub doesn't easily allow raw image uploads via Comment API without hosting them elsewhere.
-      // Often, teams upload to S3/Imgur/GH Artifacts and link them.
-      // For this test, we mention the screenshots are in the workflow artifacts.
-      body += `\n*A screenshot of this test state has been saved as an artifact: \`${res.testCase.id}.png\`.*\n\n`;
+      body += `\n*Screenshot: \`${res.testCase.id}.png\`*\n\n`;
     }
     
+    const artifactsUrl = `https://github.com/${owner}/${repo}/actions/runs/${runId}`;
     body += `---\n**Summary**: ${totalPassed} Passed | ${totalFailed} Failed\n`;
+    body += `\n📸 [View screenshots in workflow artifacts](${artifactsUrl})\n`;
     
     await octokit.rest.issues.createComment({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
+      owner,
+      repo,
       issue_number: prNumber,
       body
     });
     
-    // Block PR if there are failures
     if (totalFailed > 0) {
       core.setFailed(`UI Validation Failed: ${totalFailed} test(s) did not pass.`);
     } else {
