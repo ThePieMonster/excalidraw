@@ -91,7 +91,8 @@ export async function reportResults(results: TestResult[], token: string) {
       else totalFailed++;
 
       const icon = res.passed ? '✅' : '❌';
-      body += `### ${icon} ${res.testCase.id}: ${res.testCase.title}\n`;
+      const durationSec = (res.durationMs / 1000).toFixed(1);
+      body += `### ${icon} ${res.testCase.id}: ${res.testCase.title} ⏱️ ${durationSec}s\n`;
       body += `**Expected Result:** ${res.testCase.expectedResult}\n`;
 
       if (!res.passed && res.reason) {
@@ -114,7 +115,67 @@ export async function reportResults(results: TestResult[], token: string) {
     }
 
     const artifactsUrl = `https://github.com/${owner}/${repo}/actions/runs/${runId}`;
-    body += `---\n**Summary**: ${totalPassed} Passed | ${totalFailed} Failed\n`;
+    const totalDurationMs = results.reduce((sum, r) => sum + r.durationMs, 0);
+    const totalDurationSec = (totalDurationMs / 1000).toFixed(1);
+
+    body += `---\n**Summary**: ${totalPassed} Passed | ${totalFailed} Failed | ⏱️ Total: ${totalDurationSec}s\n`;
+    body += `\n<details>\n<summary>📊 Test Case Timing</summary>\n\n`;
+    body += `| Test Case | Status | Duration | Start | End |\n`;
+    body += `|-----------|--------|----------|-------|-----|\n`;
+    for (const res of results) {
+      const icon = res.passed ? '✅' : '❌';
+      const dur = (res.durationMs / 1000).toFixed(1);
+      const start = new Date(res.startTime).toISOString().substring(11, 19);
+      const end = new Date(res.endTime).toISOString().substring(11, 19);
+      body += `| ${res.testCase.id}: ${res.testCase.title} | ${icon} | ${dur}s | ${start} | ${end} |\n`;
+    }
+    body += `| **Total** | | **${totalDurationSec}s** | | |\n`;
+    body += `\n</details>\n`;
+
+    // Fetch CI pipeline step timings
+    try {
+      const runIdNum = parseInt(runId, 10);
+      if (!isNaN(runIdNum)) {
+        const jobsResponse = await octokit.rest.actions.listJobsForWorkflowRun({
+          owner,
+          repo,
+          run_id: runIdNum,
+        });
+
+        const jobs = jobsResponse.data.jobs;
+        if (jobs.length > 0) {
+          body += `\n<details>\n<summary>🔧 CI Pipeline Timing</summary>\n\n`;
+          
+          for (const job of jobs) {
+            const jobStart = job.started_at ? new Date(job.started_at) : null;
+            const jobEnd = job.completed_at ? new Date(job.completed_at) : null;
+            const jobDuration = jobStart && jobEnd ? ((jobEnd.getTime() - jobStart.getTime()) / 1000).toFixed(1) : '—';
+            
+            body += `**${job.name}** — ${jobDuration}s total\n\n`;
+            body += `| Step | Status | Duration |\n`;
+            body += `|------|--------|----------|\n`;
+
+            for (const step of job.steps || []) {
+              const stepStart = step.started_at ? new Date(step.started_at) : null;
+              const stepEnd = step.completed_at ? new Date(step.completed_at) : null;
+              const stepDuration = stepStart && stepEnd ? ((stepEnd.getTime() - stepStart.getTime()) / 1000).toFixed(1) + 's' : '—';
+              
+              const statusIcon = step.conclusion === 'success' ? '✅' 
+                : step.conclusion === 'failure' ? '❌' 
+                : step.conclusion === 'skipped' ? '⏭️' 
+                : '🔄';
+
+              body += `| ${step.name} | ${statusIcon} | ${stepDuration} |\n`;
+            }
+            body += `\n`;
+          }
+          body += `</details>\n`;
+        }
+      }
+    } catch (error) {
+      core.warning(`Could not fetch CI step timings: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
     body += `\n📸 [View all screenshots in workflow artifacts](${artifactsUrl})\n`;
 
     await octokit.rest.issues.createComment({
