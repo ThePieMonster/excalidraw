@@ -8,6 +8,12 @@ import { TestResult } from './executor';
  * Uploads a screenshot to the PR branch via the GitHub Contents API
  * using a [skip ci] commit so it doesn't trigger additional workflow runs.
  * Returns a raw.githubusercontent.com URL for inline embedding.
+ *
+ * NOTE: This approach uploads images to the PR branch (not master).
+ * They are automatically cleaned up when the branch is deleted after merge.
+ * If you prefer not to modify the repo at all, you can replace this with
+ * an external image host (e.g. Imgur, Cloudinary, S3) and remove the
+ * `contents: write` permission from qa-agent.yml.
  */
 async function uploadScreenshot(
   octokit: ReturnType<typeof github.getOctokit>,
