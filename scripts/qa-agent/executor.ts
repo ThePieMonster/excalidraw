@@ -12,6 +12,9 @@ export interface TestResult {
   passed: boolean;
   screenshotPath: string;
   reason?: string;
+  startTime: number;
+  endTime: number;
+  durationMs: number;
 }
 
 export async function executeTestCase(tc: TestCase, appUrl: string): Promise<TestResult> {
@@ -25,6 +28,8 @@ export async function executeTestCase(tc: TestCase, appUrl: string): Promise<Tes
   }
   
   const screenshotPath = path.join(screenshotDir, `${tc.id}.png`);
+
+  const startTime = Date.now();
 
   try {
     core.info(`Executing Test Case: ${tc.id} - ${tc.title}`);
@@ -146,22 +151,30 @@ Generate the exact sequence of JSON commands to fulfill these steps. Do not incl
     
     // Simulate Vision validation Pass:
     const passed = true; 
+    const endTime = Date.now();
 
     return {
       testCase: tc,
       passed,
-      screenshotPath
+      screenshotPath,
+      startTime,
+      endTime,
+      durationMs: endTime - startTime
     };
 
   } catch (error) {
     core.error(`Test ${tc.id} Failed: ${error}`);
     // Capture failure screenshot
     await page.screenshot({ path: screenshotPath });
+    const endTime = Date.now();
     return {
       testCase: tc,
       passed: false,
       screenshotPath,
-      reason: error instanceof Error ? error.message : String(error)
+      reason: error instanceof Error ? error.message : String(error),
+      startTime,
+      endTime,
+      durationMs: endTime - startTime
     };
   } finally {
     await browser.close();

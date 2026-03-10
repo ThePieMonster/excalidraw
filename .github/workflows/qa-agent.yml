@@ -6,8 +6,6 @@ on:
 jobs:
   ui-qa-validation:
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
     steps:
       - name: Checkout PR Code
         uses: actions/checkout@v4
@@ -50,7 +48,15 @@ jobs:
             exit 0
           fi
           npx ts-node index.ts
-        
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-agent-results
+          path: scripts/qa-agent/results/
+          retention-days: 7
+
       - name: Upload Screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -58,3 +64,41 @@ jobs:
           name: qa-agent-screenshots
           path: scripts/qa-agent/screenshots/
           retention-days: 7
+
+  report-results:
+    needs: ui-qa-validation
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+    steps:
+      - name: Checkout PR Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install QA Agent Dependencies
+        working-directory: ./scripts/qa-agent
+        run: npm install
+
+      - name: Download Test Results
+        uses: actions/download-artifact@v4
+        with:
+          name: qa-agent-results
+          path: scripts/qa-agent/results/
+
+      - name: Download Screenshots
+        uses: actions/download-artifact@v4
+        with:
+          name: qa-agent-screenshots
+          path: scripts/qa-agent/screenshots/
+
+      - name: Post PR Comment
+        working-directory: ./scripts/qa-agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx ts-node report.ts
